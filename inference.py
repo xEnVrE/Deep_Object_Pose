@@ -80,7 +80,10 @@ class DOPEInference():
         elif self.dataset_name == 'ycbv':
             pass # to be done
         elif self.dataset_name == 'ycbv_synthetic':
-            pass # to be done
+            self.camera_matrix[0,0] = 614.7142806307731
+            self.camera_matrix[1,1] = 614.7142806307731
+            self.camera_matrix[0,2] = 320.0
+            self.camera_matrix[1,2] = 240.0
         self.camera_matrix[2,2] = 1.0
         self.camera_distortion = numpy.zeros((4,1))
 
@@ -161,6 +164,9 @@ class DOPEInference():
     def process(self):
         """Process the data."""
 
+        path = None
+        output_path = None
+
         if self.dataset_name == 'ho3d':
             # More than one sequence for the same object
             for video_id in self.ho3d_video_ids[self.object_name]:
@@ -189,9 +195,14 @@ class DOPEInference():
                     Cuboid3d(self.params['dimensions'][self.object_info['name']]),
                     dist_coeffs = self.camera_distortion
                 )
+        elif self.dataset_name == 'ycbv_synthetic':
+            # Compose input path
+            path = os.path.join(self.dataset_path, self.object_name)
 
-                self.process_sequence(path, output_path)
+            # Compose output path and create it
+            output_path = os.path.join(self.output_path, self.object_name)
 
+        self.process_sequence(path, output_path)
 
 
     def process_sequence(self, path, output_path):
@@ -223,6 +234,13 @@ class DOPEInference():
 
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+            if self.dataset_name == 'ycbv_synthetic':
+                # These frames are @ 1280x720, hence they are zeropadded, extended and resized
+                # to the original resolution required for DOPE
+                img_extended = numpy.zeros((960, 1280, 3), dtype = np.uint8)
+                img_extended[120:720 + 120, :, :] = img
+                img = cv2.resize(img_extended, (640, 480))
+
             img_copy = img.copy()
             img_array = Image.fromarray(img_copy)
             draw = ImageDraw.Draw(img_array)
@@ -238,9 +256,6 @@ class DOPEInference():
 
                 # Make sure that field 'location' is valid
                 if result['location'] is not None:
-
-                    if None in result['projected_points']:
-                        exit(0)
 
                     valid_result = True
 
